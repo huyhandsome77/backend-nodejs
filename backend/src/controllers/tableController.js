@@ -116,3 +116,40 @@ exports.getTableByQRCode = async (req, res, next) => {
         next(error);
     }
 };
+
+/**
+ * Thêm hoặc cập nhật hàng loạt bàn
+ */
+exports.bulkCreateTables = async (req, res, next) => {
+    try {
+        const tables = req.body; // Mảng các bàn từ JSON
+
+        if (!Array.isArray(tables)) {
+            return res.status(400).json({ message: "Dữ liệu gửi lên phải là một mảng" });
+        }
+
+        // Sử dụng bulkCreate với updateOnDuplicate để cập nhật nếu trùng tableNumber (nếu DB hỗ trợ)
+        // Hoặc đơn giản là tạo mới. Ở đây tôi dùng lặp để đảm bảo tính an toàn và dễ debug.
+        const results = [];
+        for (const item of tables) {
+            const [table, created] = await RestaurantTable.findOrCreate({
+                where: { tableNumber: item.tableNumber },
+                defaults: item
+            });
+
+            if (!created) {
+                // Nếu đã tồn tại thì cập nhật thông tin mới
+                await table.update(item);
+            }
+            results.push(table);
+        }
+
+        res.status(201).json({
+            message: `Đã nạp thành công ${results.length} bàn vào hệ thống`,
+            data: results
+        });
+    } catch (error) {
+        console.error("Bulk Create Tables Error:", error);
+        res.status(500).json({ message: "Lỗi khi nạp dữ liệu bàn", error: error.message });
+    }
+};

@@ -2,26 +2,67 @@ const { Reservation, RestaurantTable, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
- * Tạo đặt bàn mới
+ * Tạo đặt bàn mới - Tự động phân bổ bàn
  */
 exports.createReservation = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
-        const { table_id, guestName, guestPhone, reservationTime, numberOfGuests, note, user_id } = req.body;
+        const { guestName, guestPhone, reservationTime, numberOfGuests, note, user_id } = req.body;
 
-        // Kiểm tra xem bàn có tồn tại không
-        const table = await RestaurantTable.findByPk(table_id);
-        if (!table) {
-            return res.status(404).json({ message: "Không tìm thấy bàn" });
+        // 1. Xác định khung giờ đặt (Giả định mỗi lượt là 2 tiếng)
+        const startTime = new Date(reservationTime);
+        const durationHours = 2;
+        const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+
+        // 2. Tìm tất cả các đơn đặt bàn có khả năng chồng lấn thời gian
+        // Chồng lấn khi: (Bắt đầu mới < Kết thúc cũ) AND (Kết thúc mới > Bắt đầu cũ)
+        const overlappingReservations = await Reservation.findAll({
+            where: {
+                status: { [Op.in]: ['CONFIRMED', 'CHECKED_IN'] },
+                [Op.and]: [
+                    {
+                        reservationTime: {
+                            [Op.lt]: endTime // Bắt đầu cũ < Kết thúc mới
+                        }
+                    },
+                    sequelize.where(
+                        sequelize.fn('DATE_ADD', sequelize.col('reservationTime'), sequelize.literal(`INTERVAL ${durationHours} HOUR`)),
+                        { [Op.gt]: startTime } // Kết thúc cũ > Bắt đầu mới
+                    )
+                ]
+            },
+            attributes: ['table_id'],
+            transaction: t
+        });
+
+        const occupiedTableIds = overlappingReservations.map(r => r.table_id);
+
+        // 3. Tìm bàn trống phù hợp
+        // Điều kiện: Sức chứa đủ, Không nằm trong danh sách bàn đã bận, và Sắp xếp theo sức chứa tăng dần để tối ưu
+        const availableTable = await RestaurantTable.findOne({
+            where: {
+                capacity: { [Op.gte]: numberOfGuests },
+                id: { [Op.notIn]: occupiedTableIds.length > 0 ? occupiedTableIds : [-1] },
+                status: { [Op.ne]: 'CLEANING' } // Không chọn bàn đang dọn dẹp
+            },
+            order: [['capacity', 'ASC']],
+            transaction: t
+        });
+
+        if (!availableTable) {
+            await t.rollback();
+            return res.status(400).json({
+                message: "Rất tiếc, hiện tại không còn bàn trống phù hợp với số lượng khách và khung giờ bạn yêu cầu. Vui lòng chọn khung giờ khác!"
+            });
         }
 
-        // Tạo bản ghi đặt bàn
+        // 4. Tạo bản ghi đặt bàn với table_id đã tìm được
         const reservation = await Reservation.create({
-            table_id,
-            user_id,
+            table_id: availableTable.id,
+            user_id: user_id || null,
             guestName,
             guestPhone,
-            reservationTime,
+            reservationTime: startTime,
             numberOfGuests,
             note,
             status: 'CONFIRMED'
@@ -30,11 +71,15 @@ exports.createReservation = async (req, res, next) => {
         await t.commit();
         res.status(201).json({
             message: "Đặt bàn thành công",
-            data: reservation
+            data: {
+                ...reservation.toJSON(),
+                tableNumber: availableTable.tableNumber
+            }
         });
     } catch (error) {
         await t.rollback();
-        next(error);
+        console.error("Create Reservation Error:", error);
+        res.status(500).json({ message: "Lỗi hệ thống khi đặt bàn", error: error.message });
     }
 };
 

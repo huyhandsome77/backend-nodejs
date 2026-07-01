@@ -6,7 +6,7 @@ const { seedTables } = require('./src/seeders/tableSeeder');
 const { seedProducts } = require('./src/seeders/productSeeder');
 const { seedReservations } = require('./src/seeders/reservationSeeder');
 const { seedOrders } = require('./src/seeders/orderSeeder');
-
+const { seedAdmin } = require('./src/seeders/adminSeeder');
 dotenv.config();
 
 const PORT = process.env.PORT || 3000;
@@ -17,7 +17,7 @@ connectDB();
 // Đồng bộ database.
 sequelize.sync().then(async () => {
     console.log('Database synced');
-
+    await seedAdmin();
     // Khởi động dọn dẹp đặt bàn quá hạn
     startCleanupTask();
 
