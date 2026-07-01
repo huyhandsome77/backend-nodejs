@@ -28,6 +28,7 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const reservationRoutes = require('./routes/reservationRoutes');
 const tableRoutes = require('./routes/tableRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -37,6 +38,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api/tables', tableRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

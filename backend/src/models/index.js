@@ -10,6 +10,7 @@ const Reservation = require('./Reservation')(sequelize);
 const Order = require('./Order')(sequelize);
 const OrderItem = require('./OrderItem')(sequelize);
 const Payment = require('./Payment')(sequelize);
+const Review = require('./Review')(sequelize);
 
 // --- RELATIONSHIPS ---
 
@@ -67,6 +68,10 @@ OrderItem.belongsTo(Product, { foreignKey: "product_id" });
 Order.hasOne(Payment, { foreignKey: "order_id" });
 Payment.belongsTo(Order, { foreignKey: "order_id" });
 
+// User - Review
+User.hasMany(Review, { foreignKey: "user_id", as: 'reviews' });
+Review.belongsTo(User, { foreignKey: "user_id", as: 'user' });
+
 module.exports = {
     sequelize,
     connectDB,
@@ -79,5 +84,6 @@ module.exports = {
     Reservation,
     Order,
     OrderItem,
-    Payment
+    Payment,
+    Review
 };
