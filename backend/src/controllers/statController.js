@@ -2,10 +2,6 @@ const { Order } = require('../models');
 const { Op } = require('sequelize');
 const sequelize = require('sequelize');
 
-/**
- * Lấy thống kê đơn hàng và doanh thu
- * query: type (day, month, year), date (YYYY-MM-DD)
- */
 exports.getStats = async (req, res, next) => {
     try {
         const { type = 'day', date } = req.query;

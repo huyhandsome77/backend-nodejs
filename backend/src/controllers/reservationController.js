@@ -1,33 +1,27 @@
 const { Reservation, RestaurantTable, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
-/**
- * Tạo đặt bàn mới - Tự động phân bổ bàn
- */
 exports.createReservation = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
         const { guestName, guestPhone, reservationTime, numberOfGuests, note, user_id } = req.body;
 
-        // 1. Xác định khung giờ đặt (Giả định mỗi lượt là 2 tiếng)
         const startTime = new Date(reservationTime);
         const durationHours = 2;
         const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
 
-        // 2. Tìm tất cả các đơn đặt bàn có khả năng chồng lấn thời gian
-        // Chồng lấn khi: (Bắt đầu mới < Kết thúc cũ) AND (Kết thúc mới > Bắt đầu cũ)
         const overlappingReservations = await Reservation.findAll({
             where: {
                 status: { [Op.in]: ['CONFIRMED', 'CHECKED_IN'] },
                 [Op.and]: [
                     {
                         reservationTime: {
-                            [Op.lt]: endTime // Bắt đầu cũ < Kết thúc mới
+                            [Op.lt]: endTime
                         }
                     },
                     sequelize.where(
                         sequelize.fn('DATE_ADD', sequelize.col('reservationTime'), sequelize.literal(`INTERVAL ${durationHours} HOUR`)),
-                        { [Op.gt]: startTime } // Kết thúc cũ > Bắt đầu mới
+                        { [Op.gt]: startTime }
                     )
                 ]
             },
@@ -37,13 +31,11 @@ exports.createReservation = async (req, res, next) => {
 
         const occupiedTableIds = overlappingReservations.map(r => r.table_id);
 
-        // 3. Tìm bàn trống phù hợp
-        // Điều kiện: Sức chứa đủ, Không nằm trong danh sách bàn đã bận, và Sắp xếp theo sức chứa tăng dần để tối ưu
         const availableTable = await RestaurantTable.findOne({
             where: {
                 capacity: { [Op.gte]: numberOfGuests },
                 id: { [Op.notIn]: occupiedTableIds.length > 0 ? occupiedTableIds : [-1] },
-                status: { [Op.ne]: 'CLEANING' } // Không chọn bàn đang dọn dẹp
+                status: { [Op.ne]: 'CLEANING' }
             },
             order: [['capacity', 'ASC']],
             transaction: t
@@ -56,7 +48,6 @@ exports.createReservation = async (req, res, next) => {
             });
         }
 
-        // 4. Tạo bản ghi đặt bàn với table_id đã tìm được
         const reservation = await Reservation.create({
             table_id: availableTable.id,
             user_id: user_id || null,
@@ -83,9 +74,6 @@ exports.createReservation = async (req, res, next) => {
     }
 };
 
-/**
- * Xác nhận khách đã đến (Check-in)
- */
 exports.checkIn = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
@@ -100,11 +88,9 @@ exports.checkIn = async (req, res, next) => {
             return res.status(400).json({ message: "Trạng thái đặt bàn không hợp lệ để check-in" });
         }
 
-        // Cập nhật trạng thái đặt bàn
         reservation.status = 'CHECKED_IN';
         await reservation.save({ transaction: t });
 
-        // Cập nhật trạng thái bàn sang OCCUPIED
         await RestaurantTable.update(
             { status: 'OCCUPIED' },
             { where: { id: reservation.table_id }, transaction: t }
@@ -118,9 +104,6 @@ exports.checkIn = async (req, res, next) => {
     }
 };
 
-/**
- * Hủy đặt bàn
- */
 exports.cancelReservation = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -139,9 +122,6 @@ exports.cancelReservation = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy danh sách đặt bàn của người dùng đang đăng nhập
- */
 exports.getMyReservations = async (req, res, next) => {
     try {
         const userId = req.user.id;
@@ -156,9 +136,6 @@ exports.getMyReservations = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy danh sách đặt bàn
- */
 exports.getAllReservations = async (req, res, next) => {
     try {
         const reservations = await Reservation.findAll({

@@ -2,7 +2,6 @@ const { User } = require('../models');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 
-// 1. Lấy danh sách tất cả người dùng
 const getAllUsers = async (req, res) => {
     try {
         const { search } = req.query;
@@ -29,7 +28,6 @@ const getAllUsers = async (req, res) => {
     }
 };
 
-// 2. Lấy thông tin chi tiết một người dùng theo ID
 const getUserById = async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id, {
@@ -46,7 +44,6 @@ const getUserById = async (req, res) => {
     }
 };
 
-// 3. Lấy thông tin cá nhân (Profile)
 const getUserProfile = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -64,7 +61,6 @@ const getUserProfile = async (req, res) => {
     }
 };
 
-// 4. Cập nhật Profile cá nhân
 const updateProfile = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -88,12 +84,10 @@ const updateProfile = async (req, res) => {
     }
 };
 
-// 5. Tạo người dùng mới (Dành cho Admin)
 const createUser = async (req, res) => {
     try {
         const { fullName, email, phone, username, password, role } = req.body;
 
-        // Kiểm tra xem username hoặc phone đã tồn tại chưa
         const userExists = await User.findOne({
             where: {
                 [Op.or]: [{ username }, { phone }]
@@ -129,7 +123,6 @@ const createUser = async (req, res) => {
     }
 };
 
-// 5. Cập nhật thông tin người dùng
 const updateUser = async (req, res) => {
     try {
         const { fullName, email, phone, username, avatar, points, role, status } = req.body;
@@ -139,7 +132,6 @@ const updateUser = async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy người dùng" });
         }
 
-        // Cập nhật các trường
         await user.update({
             fullName: fullName || user.fullName,
             email: email || user.email,
@@ -157,7 +149,6 @@ const updateUser = async (req, res) => {
     }
 };
 
-// 6. Xóa người dùng
 const deleteUser = async (req, res) => {
     try {
         const user = await User.findByPk(req.params.id);

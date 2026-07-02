@@ -1,24 +1,16 @@
 const { RestaurantTable, Reservation } = require('../models');
 const { Op } = require('sequelize');
 
-/**
- * Lấy danh sách bàn kèm theo trạng thái được tính toán theo thời gian thực
- */
 exports.getAllTables = async (req, res, next) => {
     try {
         const tables = await RestaurantTable.findAll();
         const now = new Date();
-
-        // Khoảng thời gian để chuyển sang "Đã đặt" (30 phút trước)
         const bookingThreshold = new Date(now.getTime() + 30 * 60000);
-
-        // Khoảng thời gian để "Hết hạn" (ví dụ 30 phút sau giờ đặt)
         const expiryThreshold = new Date(now.getTime() - 30 * 60000);
 
         const updatedTables = await Promise.all(tables.map(async (table) => {
             const tableData = table.toJSON();
 
-            // Nếu bàn đang OCCUPIED, tìm giờ check-in để tính thời gian sử dụng
             if (table.status === 'OCCUPIED') {
                 const checkInRes = await Reservation.findOne({
                     where: {
@@ -38,13 +30,12 @@ exports.getAllTables = async (req, res, next) => {
                 }
             }
 
-            // Tìm đặt bàn gần nhất đang chờ (CONFIRMED)
             const activeReservation = await Reservation.findOne({
                 where: {
                     table_id: table.id,
                     status: 'CONFIRMED',
                     reservationTime: {
-                        [Op.gte]: expiryThreshold // Chỉ lấy các booking chưa quá hạn quá lâu
+                        [Op.gte]: expiryThreshold
                     }
                 },
                 order: [['reservationTime', 'ASC']]
@@ -52,24 +43,20 @@ exports.getAllTables = async (req, res, next) => {
 
             if (activeReservation) {
                 const resTime = new Date(activeReservation.reservationTime);
-
-                // Nếu hiện tại nằm trong khoảng [Giờ đặt - 30p, Giờ đặt + 30p]
                 if (now >= new Date(resTime.getTime() - 30 * 60000)) {
-                    // Nếu chưa đến giờ thì là Đã đặt, nếu quá giờ thì là Chờ khách (vẫn hiển thị BOOKED)
                     tableData.calculatedStatus = 'BOOKED';
                     tableData.activeReservation = activeReservation;
 
                     if (now >= resTime) {
-                        tableData.waitingAlert = true; // Thông báo chờ khách
+                        tableData.waitingAlert = true;
                     }
                 }
             }
 
-            // Nếu bàn đang OCCUPIED thì giữ nguyên
             if (table.status === 'OCCUPIED') {
                 tableData.calculatedStatus = 'OCCUPIED';
             } else if (!tableData.calculatedStatus) {
-                tableData.calculatedStatus = table.status; // AVAILABLE hoặc CLEANING
+                tableData.calculatedStatus = table.status;
             }
 
             return tableData;
@@ -82,9 +69,6 @@ exports.getAllTables = async (req, res, next) => {
     }
 };
 
-/**
- * Cập nhật trạng thái bàn thủ công (ví dụ: xong việc dọn dẹp)
- */
 exports.updateTableStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -97,9 +81,6 @@ exports.updateTableStatus = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy thông tin bàn bằng mã QR
- */
 exports.getTableByQRCode = async (req, res, next) => {
     try {
         const { qrCode } = req.params;
@@ -117,35 +98,20 @@ exports.getTableByQRCode = async (req, res, next) => {
     }
 };
 
-/**
- * Thêm hoặc cập nhật hàng loạt bàn
- */
 exports.bulkCreateTables = async (req, res, next) => {
     try {
-        const tables = req.body; // Mảng các bàn từ JSON
+        const tables = req.body;
 
         if (!Array.isArray(tables)) {
             return res.status(400).json({ message: "Dữ liệu gửi lên phải là một mảng" });
         }
 
-        // Sử dụng bulkCreate với updateOnDuplicate để cập nhật nếu trùng tableNumber (nếu DB hỗ trợ)
-        // Hoặc đơn giản là tạo mới. Ở đây tôi dùng lặp để đảm bảo tính an toàn và dễ debug.
-        const results = [];
-        for (const item of tables) {
-            const [table, created] = await RestaurantTable.findOrCreate({
-                where: { tableNumber: item.tableNumber },
-                defaults: item
-            });
-
-            if (!created) {
-                // Nếu đã tồn tại thì cập nhật thông tin mới
-                await table.update(item);
-            }
-            results.push(table);
-        }
+        const results = await RestaurantTable.bulkCreate(tables, {
+            updateOnDuplicate: ['capacity', 'qrCode', 'status']
+        });
 
         res.status(201).json({
-            message: `Đã nạp thành công ${results.length} bàn vào hệ thống`,
+            message: `Đã xử lý thành công ${results.length} bàn trong hệ thống`,
             data: results
         });
     } catch (error) {

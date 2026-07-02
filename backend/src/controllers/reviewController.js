@@ -1,10 +1,6 @@
 const { Review, User } = require('../models');
 const { Op } = require('sequelize');
 
-/**
- * Lấy tất cả đánh giá cho Admin
- * Hỗ trợ phân trang và lọc theo ngày
- */
 exports.getAllReviews = async (req, res, next) => {
     try {
         const { page = 1, limit = 10, date } = req.query;
@@ -12,7 +8,6 @@ exports.getAllReviews = async (req, res, next) => {
 
         const whereClause = {};
         if (date) {
-            // Lọc theo ngày (YYYY-MM-DD)
             const startDate = new Date(date);
             startDate.setHours(0, 0, 0, 0);
 
@@ -47,9 +42,6 @@ exports.getAllReviews = async (req, res, next) => {
     }
 };
 
-/**
- * Người dùng hoặc khách gửi đánh giá
- */
 exports.createReview = async (req, res, next) => {
     try {
         const { user_id, phone, dish_name, content, rating } = req.body;
@@ -75,9 +67,6 @@ exports.createReview = async (req, res, next) => {
     }
 };
 
-/**
- * Admin xóa đánh giá
- */
 exports.deleteReview = async (req, res, next) => {
     try {
         const { id } = req.params;

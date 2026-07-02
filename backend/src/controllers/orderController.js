@@ -1,8 +1,5 @@
 const { Order, OrderItem, Product, RestaurantTable, User, sequelize } = require('../models');
 
-/**
- * Tạo đơn hàng mới (Dùng cho cả QR Order và App Order)
- */
 exports.createOrder = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
@@ -15,7 +12,6 @@ exports.createOrder = async (req, res, next) => {
         let totalPrice = 0;
         const orderItemsData = [];
 
-        // Kiểm tra và tính giá từng item
         for (const item of items) {
             const product = await Product.findByPk(item.product_id);
             if (!product) {
@@ -33,25 +29,22 @@ exports.createOrder = async (req, res, next) => {
             });
         }
 
-        // Tạo Order
         const order = await Order.create({
             table_id,
-            user_id: user_id || null, // Có thể null nếu khách vãng lai quét QR
+            user_id: user_id || null,
             totalPrice,
-            finalPrice: totalPrice, // Tạm thời chưa tính discount
+            finalPrice: totalPrice,
             note,
             status: 'PENDING',
             paymentStatus: 'UNPAID'
         }, { transaction: t });
 
-        // Tạo OrderItems
         const itemsWithOrderId = orderItemsData.map(item => ({
             ...item,
             order_id: order.id
         }));
         await OrderItem.bulkCreate(itemsWithOrderId, { transaction: t });
 
-        // Nếu có table_id, cập nhật trạng thái bàn sang OCCUPIED
         if (table_id) {
             await RestaurantTable.update(
                 { status: 'OCCUPIED' },
@@ -61,7 +54,6 @@ exports.createOrder = async (req, res, next) => {
 
         await t.commit();
 
-        // Lấy lại order kèm chi tiết để trả về
         const createdOrder = await Order.findByPk(order.id, {
             include: [
                 { model: OrderItem, include: [Product] }
@@ -80,9 +72,6 @@ exports.createOrder = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy tất cả đơn hàng (có phân trang và lọc)
- */
 exports.getAllOrders = async (req, res, next) => {
     try {
         const { status, paymentStatus } = req.query;
@@ -108,9 +97,6 @@ exports.getAllOrders = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy chi tiết một đơn hàng
- */
 exports.getOrderById = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -134,9 +120,6 @@ exports.getOrderById = async (req, res, next) => {
     }
 };
 
-/**
- * Cập nhật trạng thái đơn hàng
- */
 exports.updateOrderStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -158,9 +141,6 @@ exports.updateOrderStatus = async (req, res, next) => {
     }
 };
 
-/**
- * Xóa đơn hàng (thường là Soft Delete hoặc chỉ cho phép xóa khi PENDING/CANCELLED)
- */
 exports.deleteOrder = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -176,9 +156,6 @@ exports.deleteOrder = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy hóa đơn hiện tại của một bàn
- */
 exports.getCurrentOrderByTable = async (req, res, next) => {
     try {
         const { tableId } = req.params;
@@ -207,9 +184,6 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
     }
 };
 
-/**
- * Thanh toán hóa đơn
- */
 exports.payOrder = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
@@ -224,16 +198,14 @@ exports.payOrder = async (req, res, next) => {
             return res.status(400).json({ message: "Đơn hàng này đã được thanh toán trước đó" });
         }
 
-        // Cập nhật trạng thái đơn hàng
         await order.update({
             paymentStatus: 'PAID',
             status: 'COMPLETED'
         }, { transaction: t });
 
-        // Cập nhật trạng thái bàn về CLEANING (đang dọn dẹp) hoặc AVAILABLE
         if (order.table_id) {
             await RestaurantTable.update(
-                { status: 'AVAILABLE' }, // Chuyển về Trống luôn cho tiện test
+                { status: 'AVAILABLE' },
                 { where: { id: order.table_id }, transaction: t }
             );
         }
@@ -246,9 +218,6 @@ exports.payOrder = async (req, res, next) => {
     }
 };
 
-/**
- * Lấy danh sách đơn hàng của người dùng đang đăng nhập
- */
 exports.getMyOrders = async (req, res, next) => {
     try {
         const userId = req.user.id;
