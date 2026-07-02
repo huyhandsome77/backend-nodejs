@@ -30,6 +30,10 @@ module.exports = (sequelize) => {
             type: DataTypes.ENUM("UNPAID", "PAID", "REFUNDED"),
             defaultValue: "UNPAID",
         },
+        isPointsAdded: {
+            type: DataTypes.BOOLEAN,
+            defaultValue: false,
+        },
     }, {
         tableName: 'orders',
         timestamps: true,
