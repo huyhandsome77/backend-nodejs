@@ -177,6 +177,7 @@ module.exports = {
     getAllUsers,
     getUserById,
     getUserProfile,
+    updateProfile,
     createUser,
     updateUser,
     deleteUser
