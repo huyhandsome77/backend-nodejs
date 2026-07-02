@@ -12,6 +12,7 @@ router.put('/:id/status', orderController.updateOrderStatus);
 router.delete('/:id', orderController.deleteOrder);
 
 router.get('/table/:tableId', orderController.getCurrentOrderByTable);
+router.get('/:id/payment-qr', orderController.getPaymentQR);
 router.put('/:id/pay', orderController.payOrder);
 
 module.exports = router;

@@ -196,6 +196,8 @@ exports.payOrder = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
         const { id } = req.params;
+        const { paymentMethod } = req.body; // CASH or TRANSFER
+
         const order = await Order.findByPk(id);
 
         if (!order) {
@@ -208,7 +210,8 @@ exports.payOrder = async (req, res, next) => {
 
         await order.update({
             paymentStatus: 'PAID',
-            status: 'COMPLETED'
+            status: 'COMPLETED',
+            paymentMethod: paymentMethod || 'CASH'
         }, { transaction: t });
 
         if (order.table_id) {
@@ -223,6 +226,36 @@ exports.payOrder = async (req, res, next) => {
     } catch (error) {
         await t.rollback();
         console.error("Pay Order Error:", error);
+        next(error);
+    }
+};
+
+/**
+ * Tạo link QR MoMo/VietQR cho đơn hàng
+ */
+exports.getPaymentQR = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const order = await Order.findByPk(id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+        }
+
+        // Thông tin tài khoản nhận tiền (Bạn hãy thay đổi theo thông tin thật)
+        const BANK_ID = "970422"; // MB Bank (Ví dụ)
+        const ACCOUNT_NO = "0123456789";
+        const ACCOUNT_NAME = "NHA HANG FUTURE SUSHI";
+
+        // Tạo link VietQR (Momo scan được link này)
+        // Cấu trúc: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<NAME>
+        const amount = Math.round(order.finalPrice);
+        const description = `THANH TOAN DON HANG ${order.id}`;
+
+        const qrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact.png?amount=${amount}&addInfo=${description}&accountName=${ACCOUNT_NAME}`;
+
+        res.json({ qrUrl });
+    } catch (error) {
         next(error);
     }
 };
