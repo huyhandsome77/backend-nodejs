@@ -170,7 +170,7 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
             where: {
                 table_id: tableId,
                 paymentStatus: 'UNPAID',
-                status: ['CONFIRMED', 'PREPARING', 'READY']
+                status: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY']
             },
             include: [
                 {
