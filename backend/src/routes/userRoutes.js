@@ -9,13 +9,16 @@ router.get('/', verifyToken, isAdmin, userController.getAllUsers);
 // 2. Lấy thông tin cá nhân
 router.get('/profile', verifyToken, userController.getUserProfile);
 
-// 3. Lấy thông tin chi tiết một người dùng (Admin)
+// 3. Cập nhật thông tin cá nhân
+router.put('/profile', verifyToken, userController.updateProfile);
+
+// 4. Lấy thông tin chi tiết một người dùng (Admin)
 router.get('/:id', verifyToken, isAdmin, userController.getUserById);
 
-// 4. Tạo người dùng mới (Admin)
+// 5. Tạo người dùng mới (Admin)
 router.post('/', verifyToken, isAdmin, userController.createUser);
 
-// 5. Cập nhật thông tin người dùng (Admin hoặc chính user đó - ở đây tạm thời để Admin)
+// 6. Cập nhật thông tin người dùng (Admin)
 router.put('/:id', verifyToken, isAdmin, userController.updateUser);
 
 // 6. Xóa người dùng (Admin)

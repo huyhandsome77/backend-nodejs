@@ -245,3 +245,26 @@ exports.payOrder = async (req, res, next) => {
         next(error);
     }
 };
+
+/**
+ * Lấy danh sách đơn hàng của người dùng đang đăng nhập
+ */
+exports.getMyOrders = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const orders = await Order.findAll({
+            where: { user_id: userId },
+            include: [
+                { model: RestaurantTable, as: 'RestaurantTable' },
+                {
+                    model: OrderItem,
+                    include: [{ model: Product }]
+                }
+            ],
+            order: [['created_at', 'DESC']]
+        });
+        res.json(orders);
+    } catch (error) {
+        next(error);
+    }
+};

@@ -64,7 +64,31 @@ const getUserProfile = async (req, res) => {
     }
 };
 
-// 4. Tạo người dùng mới (Dành cho Admin)
+// 4. Cập nhật Profile cá nhân
+const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { fullName, email, phone, avatar } = req.body;
+        const user = await User.findByPk(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng" });
+        }
+
+        await user.update({
+            fullName: fullName || user.fullName,
+            email: email || user.email,
+            phone: phone || user.phone,
+            avatar: avatar || user.avatar
+        });
+
+        res.json({ message: "Cập nhật hồ sơ thành công", user });
+    } catch (error) {
+        res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+};
+
+// 5. Tạo người dùng mới (Dành cho Admin)
 const createUser = async (req, res) => {
     try {
         const { fullName, email, phone, username, password, role } = req.body;

@@ -140,6 +140,23 @@ exports.cancelReservation = async (req, res, next) => {
 };
 
 /**
+ * Lấy danh sách đặt bàn của người dùng đang đăng nhập
+ */
+exports.getMyReservations = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const reservations = await Reservation.findAll({
+            where: { user_id: userId },
+            include: [{ model: RestaurantTable, as: 'table' }],
+            order: [['reservationTime', 'DESC']]
+        });
+        res.json(reservations);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
  * Lấy danh sách đặt bàn
  */
 exports.getAllReservations = async (req, res, next) => {
@@ -147,6 +164,23 @@ exports.getAllReservations = async (req, res, next) => {
         const reservations = await Reservation.findAll({
             include: [{ model: RestaurantTable, as: 'table' }],
             order: [['reservationTime', 'ASC']]
+        });
+        res.json(reservations);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Lấy danh sách đặt bàn của người dùng đang đăng nhập
+ */
+exports.getMyReservations = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const reservations = await Reservation.findAll({
+            where: { user_id: userId },
+            include: [{ model: RestaurantTable, as: 'table' }],
+            order: [['reservationTime', 'DESC']]
         });
         res.json(reservations);
     } catch (error) {
