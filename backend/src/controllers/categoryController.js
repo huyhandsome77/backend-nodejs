@@ -34,6 +34,7 @@ exports.getAllCategories = async (req, res) => {
 
         res.json(result);
     } catch (error) {
+        console.error("Get All Categories Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -44,6 +45,7 @@ exports.getCategoryById = async (req, res) => {
         if (!category) return res.status(404).json({ message: "Not found" });
         res.json(category);
     } catch (error) {
+        console.error("Get All Categories Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -78,6 +80,7 @@ exports.deleteCategory = async (req, res) => {
         if (!deleted) return res.status(404).json({ message: "Not found" });
         res.status(204).send();
     } catch (error) {
+        console.error("Get All Categories Error:", error);
         res.status(500).json({ message: error.message });
     }
 };

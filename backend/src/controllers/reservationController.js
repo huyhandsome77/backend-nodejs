@@ -1,4 +1,4 @@
-const { Reservation, RestaurantTable, sequelize } = require('../models');
+const { Reservation, RestaurantTable, User, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 exports.createReservation = async (req, res, next) => {
@@ -139,7 +139,7 @@ exports.getMyReservations = async (req, res, next) => {
 exports.getAllReservations = async (req, res, next) => {
     try {
         const reservations = await Reservation.findAll({
-            include: [{ model: RestaurantTable, as: 'table' }],
+            include: [{ model: RestaurantTable, as: 'table' }, { model: User, as: 'User' }],
             order: [['reservationTime', 'ASC']]
         });
         res.json(reservations);

@@ -56,7 +56,7 @@ exports.createOrder = async (req, res, next) => {
 
         const createdOrder = await Order.findByPk(order.id, {
             include: [
-                { model: OrderItem, include: [Product] }
+                { model: OrderItem, as: 'OrderItems', include: [{ model: Product, as: 'Product' }] }
             ]
         });
 
@@ -83,16 +83,18 @@ exports.getAllOrders = async (req, res, next) => {
             where: whereClause,
             include: [
                 { model: RestaurantTable, as: 'RestaurantTable' },
-                { model: User, attributes: ['id', 'fullName', 'phone'] },
+                { model: User, as: 'User', attributes: ['id', 'fullName', 'phone'] },
                 {
                     model: OrderItem,
-                    include: [{ model: Product }]
+                    as: 'OrderItems',
+                    include: [{ model: Product, as: 'Product' }]
                 }
             ],
             order: [['created_at', 'DESC']]
         });
         res.json(orders);
     } catch (error) {
+        console.error("Get All Orders Error:", error);
         next(error);
     }
 };
@@ -103,10 +105,11 @@ exports.getOrderById = async (req, res, next) => {
         const order = await Order.findByPk(id, {
             include: [
                 { model: RestaurantTable, as: 'RestaurantTable' },
-                { model: User, attributes: ['id', 'fullName', 'phone'] },
+                { model: User, as: 'User', attributes: ['id', 'fullName', 'phone'] },
                 {
                     model: OrderItem,
-                    include: [{ model: Product }]
+                    as: 'OrderItems',
+                    include: [{ model: Product, as: 'Product' }]
                 }
             ]
         });
@@ -116,6 +119,7 @@ exports.getOrderById = async (req, res, next) => {
         }
         res.json(order);
     } catch (error) {
+        console.error("Get Order By Id Error:", error);
         next(error);
     }
 };
@@ -137,6 +141,7 @@ exports.updateOrderStatus = async (req, res, next) => {
         await order.update(updateData);
         res.json({ message: "Cập nhật đơn hàng thành công", data: order });
     } catch (error) {
+        console.error("Update Order Status Error:", error);
         next(error);
     }
 };
@@ -152,6 +157,7 @@ exports.deleteOrder = async (req, res, next) => {
         await order.destroy();
         res.json({ message: "Xóa đơn hàng thành công" });
     } catch (error) {
+        console.error("Delete Order Error:", error);
         next(error);
     }
 };
@@ -169,7 +175,8 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
             include: [
                 {
                     model: OrderItem,
-                    include: [{ model: Product }]
+                    as: 'OrderItems',
+                    include: [{ model: Product, as: 'Product' }]
                 }
             ]
         });
@@ -180,6 +187,7 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
 
         res.json(order);
     } catch (error) {
+        console.error("Get Current Order By Table Error:", error);
         next(error);
     }
 };
@@ -214,6 +222,7 @@ exports.payOrder = async (req, res, next) => {
         res.json({ message: "Thanh toán thành công. Bàn hiện đã sẵn sàng." });
     } catch (error) {
         await t.rollback();
+        console.error("Pay Order Error:", error);
         next(error);
     }
 };
@@ -227,13 +236,15 @@ exports.getMyOrders = async (req, res, next) => {
                 { model: RestaurantTable, as: 'RestaurantTable' },
                 {
                     model: OrderItem,
-                    include: [{ model: Product }]
+                    as: 'OrderItems',
+                    include: [{ model: Product, as: 'Product' }]
                 }
             ],
             order: [['created_at', 'DESC']]
         });
         res.json(orders);
     } catch (error) {
+        console.error("Get My Orders Error:", error);
         next(error);
     }
 };

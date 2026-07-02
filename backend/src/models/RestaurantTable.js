@@ -28,6 +28,6 @@ module.exports = (sequelize) => {
         tableName: 'restaurant_tables',
         timestamps: true,
         createdAt: 'created_at',
-        updatedAt: 'updated_at',
+        updatedAt: false,
     });
 };
