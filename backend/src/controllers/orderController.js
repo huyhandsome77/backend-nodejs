@@ -231,7 +231,7 @@ exports.payOrder = async (req, res, next) => {
 };
 
 /**
- * Tạo link QR MoMo/VietQR cho đơn hàng
+ * Tạo link QR PayOS/VietQR cho đơn hàng
  */
 exports.getPaymentQR = async (req, res, next) => {
     try {
@@ -247,7 +247,7 @@ exports.getPaymentQR = async (req, res, next) => {
         const ACCOUNT_NO = "0123456789";
         const ACCOUNT_NAME = "NHA HANG FUTURE SUSHI";
 
-        // Tạo link VietQR (Momo scan được link này)
+        // Tạo link VietQR (Hỗ trợ quét qua App ngân hàng)
         // Cấu trúc: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<NAME>
         const amount = Math.round(order.finalPrice);
         const description = `THANH TOAN DON HANG ${order.id}`;

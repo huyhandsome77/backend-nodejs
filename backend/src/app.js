@@ -31,7 +31,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const pointRoutes = require('./routes/pointRoutes');
 const statRoutes = require('./routes/statRoutes');
-const momoRoutes = require('./routes/momoRoutes');
+const payosRoutes = require('./routes/payosRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -44,7 +44,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/points', pointRoutes);
 app.use('/api/stats', statRoutes);
-app.use('/api/momo', momoRoutes);
+app.use('/api/payos', payosRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
