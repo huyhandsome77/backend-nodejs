@@ -40,7 +40,7 @@ Reservation.belongsTo(User, { foreignKey: "user_id", as: 'User' });
 
 // RestaurantTable - Reservation
 RestaurantTable.hasMany(Reservation, { foreignKey: "table_id", as: 'reservations' });
-Reservation.belongsTo(RestaurantTable, { foreignKey: "table_id", as: 'RestaurantTable' });
+Reservation.belongsTo(RestaurantTable, { foreignKey: "table_id", as: 'table' });
 
 // User - Order
 User.hasMany(Order, { foreignKey: "user_id", as: 'orders' });

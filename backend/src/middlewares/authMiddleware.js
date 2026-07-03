@@ -46,3 +46,14 @@ exports.isAdmin = (req, res, next) => {
         });
     }
 };
+
+exports.isStaffOrAdmin = (req, res, next) => {
+    const role = req.user?.role?.toUpperCase();
+    if (role === "ADMIN" || role === "STAFF") {
+        next();
+    } else {
+        return res.status(403).json({
+            message: "Access denied. Staff or Admin only."
+        });
+    }
+};
