@@ -1,7 +1,11 @@
-const PayOS = require("@payos/node");
+const { PayOS } = require("@payos/node");
 const { Order, RestaurantTable } = require("../models");
 
-// Cấu hình PayOS (Đây là bộ khóa TEST)
+const payos = new PayOS({
+    clientId: process.env.PAYOS_CLIENT_ID,
+    apiKey: process.env.PAYOS_API_KEY,
+    checksumKey: process.env.PAYOS_CHECKSUM_KEY
+});
 
 
 exports.createPaymentLink = async (req, res, next) => {
@@ -11,18 +15,28 @@ exports.createPaymentLink = async (req, res, next) => {
 
         if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
 
-        const domain = "http://54.81.9.236:3000"; // Domain của bạn
+        const domain = "http://54.81.9.236:3000";
+
+        // TẠO MÃ ORDERCODE DUY NHẤT (PayOS yêu cầu Number và không trùng lặp)
+        // Kết hợp ID đơn hàng với 4 số cuối của timestamp để đảm bảo không trùng khi nhấn lại
+        const orderCode = Number(String(order.id) + String(Math.floor(Date.now() / 1000)).slice(-4));
 
         const paymentBody = {
-            orderCode: Number(order.id),
-            amount: Math.round(order.finalPrice),
-            description: `Thanh toan đơn ${order.id}`,
+            orderCode: orderCode,
+            amount: Math.round(Number(order.finalPrice)),
+            description: `THANH TOAN DH ${order.id}`, // Không dấu, ngắn gọn
             returnUrl: `${domain}/payment-success`,
             cancelUrl: `${domain}/payment-cancel`,
         };
 
+        console.log("PayOS Creating Link with body:", paymentBody);
+
         const paymentLinkResponse = await payos.createPaymentLink(paymentBody);
-        res.json(paymentLinkResponse); // Trả về checkoutUrl
+
+        // Cập nhật lại note của đơn hàng để lưu mã orderCode này (dùng để Webhook tìm lại đơn)
+        await order.update({ note: (order.note || "") + ` [PayOSCode:${orderCode}]` });
+
+        res.json(paymentLinkResponse);
 
     } catch (error) {
         console.error("PayOS Create Error:", error);
@@ -31,16 +45,23 @@ exports.createPaymentLink = async (req, res, next) => {
 };
 
 /**
- * PayOS Webhook - Nhận thông báo thanh toán thành công
+ * PayOS Webhook - Tự động nhận thông báo thanh toán thành công
  */
 exports.payosWebhook = async (req, res) => {
     try {
         const webhookData = req.body;
+        console.log("PayOS Webhook Data:", JSON.stringify(webhookData));
 
-        // Kiểm tra dữ liệu và cập nhật đơn hàng
-        if (webhookData.code === "00") { // Thanh toán thành công
-            const orderCode = webhookData.data.orderCode;
-            const order = await Order.findByPk(orderCode);
+        if (webhookData.code === "00") { // 00 là mã thành công của PayOS
+            const { orderCode } = webhookData.data;
+
+            // Tìm đơn hàng bằng cách lọc trong trường note có chứa mã PayOSCode
+            const { Op } = require('sequelize');
+            const order = await Order.findOne({
+                where: {
+                    note: { [Op.like]: `%[PayOSCode:${orderCode}]%` }
+                }
+            });
 
             if (order && order.paymentStatus !== 'PAID') {
                 await order.update({
@@ -52,7 +73,7 @@ exports.payosWebhook = async (req, res) => {
                 if (order.table_id) {
                     await RestaurantTable.update({ status: 'AVAILABLE' }, { where: { id: order.table_id } });
                 }
-                console.log(`Đơn hàng ${orderCode} đã thanh toán tự động qua PayOS.`);
+                console.log(`Đơn hàng ID ${order.id} đã tự động thanh toán qua PayOS thành công.`);
             }
         }
 
