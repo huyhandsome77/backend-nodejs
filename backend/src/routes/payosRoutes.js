@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const payosController = require('../controllers/payosController');
 
+// Debug PayOS
+router.get('/debug', payosController.debugPayOS);
+
 // App gọi để lấy link thanh toán
 router.post('/create-payment-link', payosController.createPaymentLink);
 
