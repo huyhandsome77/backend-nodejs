@@ -6,12 +6,13 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 router.get('/my-orders', verifyToken, orderController.getMyOrders);
 
 router.get('/', orderController.getAllOrders);
-router.post('/', orderController.createOrder);
+router.post('/', verifyToken, orderController.createOrder);
 router.get('/:id', orderController.getOrderById);
 router.put('/:id/status', orderController.updateOrderStatus);
 router.delete('/:id', orderController.deleteOrder);
 
 router.get('/table/:tableId', orderController.getCurrentOrderByTable);
+router.put('/table/:tableId/pay-all', orderController.payAllOrdersByTable);
 router.get('/:id/payment-qr', orderController.getPaymentQR);
 router.put('/:id/pay', orderController.payOrder);
 

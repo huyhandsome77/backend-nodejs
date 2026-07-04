@@ -3,7 +3,11 @@ const { Order, OrderItem, Product, RestaurantTable, User, sequelize } = require(
 exports.createOrder = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
-        const { table_id, items, note, user_id } = req.body;
+        const { table_id, items, note, used_points } = req.body;
+        // Ưu tiên lấy userId từ Token để chính xác tuyệt đối
+        const user_id = req.user ? req.user.id : (req.body.user_id || null);
+
+        console.log(">>> Create Order Request:", { table_id, user_id, used_points });
 
         if (!items || !items.length) {
             return res.status(400).json({ message: "Đơn hàng phải có ít nhất một món ăn" });
@@ -29,11 +33,34 @@ exports.createOrder = async (req, res, next) => {
             });
         }
 
+        // Xử lý điểm thưởng (1 điểm = 1đ)
+        let discountAmount = 0;
+        const pointsToUse = parseInt(used_points) || 0;
+
+        if (user_id && pointsToUse > 0) {
+            const user = await User.findByPk(user_id);
+            console.log(">>> Found User for points:", user ? { id: user.id, points: user.points } : "Not Found");
+
+            if (user && user.points >= pointsToUse) {
+                discountAmount = pointsToUse;
+                // Trừ điểm của người dùng
+                const newPoints = user.points - pointsToUse;
+                await user.update({ points: newPoints }, { transaction: t });
+                console.log(`>>> Deducted ${pointsToUse} points. New points: ${newPoints}`);
+            } else if (user && user.points < pointsToUse) {
+                throw new Error(`Số điểm tích lũy (${user.points}) không đủ để áp dụng (${pointsToUse})`);
+            }
+        }
+
+        const finalPrice = Math.max(0, totalPrice - discountAmount);
+        console.log(">>> Pricing calculation:", { totalPrice, discountAmount, finalPrice });
+
         const order = await Order.create({
             table_id,
             user_id: user_id || null,
             totalPrice,
-            finalPrice: totalPrice,
+            discountAmount,
+            finalPrice,
             note,
             status: 'PENDING',
             paymentStatus: 'UNPAID'
@@ -127,19 +154,15 @@ exports.getOrderById = async (req, res, next) => {
 exports.updateOrderStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { status, paymentStatus } = req.body;
+        const { status } = req.body;
 
         const order = await Order.findByPk(id);
         if (!order) {
             return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
         }
 
-        const updateData = {};
-        if (status) updateData.status = status;
-        if (paymentStatus) updateData.paymentStatus = paymentStatus;
-
-        await order.update(updateData);
-        res.json({ message: "Cập nhật đơn hàng thành công", data: order });
+        await order.update({ status });
+        res.json({ message: "Cập nhật trạng thái thành công", data: order });
     } catch (error) {
         console.error("Update Order Status Error:", error);
         next(error);
@@ -166,7 +189,7 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
     try {
         const { tableId } = req.params;
 
-        const order = await Order.findOne({
+        const orders = await Order.findAll({
             where: {
                 table_id: tableId,
                 paymentStatus: 'UNPAID',
@@ -181,13 +204,55 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
             ]
         });
 
-        if (!order) {
+        if (!orders || orders.length === 0) {
             return res.status(404).json({ message: "Bàn hiện không có hóa đơn chưa thanh toán" });
         }
 
-        res.json(order);
+        res.json(orders);
     } catch (error) {
         console.error("Get Current Order By Table Error:", error);
+        next(error);
+    }
+};
+
+exports.payAllOrdersByTable = async (req, res, next) => {
+    const t = await sequelize.transaction();
+    try {
+        const { tableId } = req.params;
+        const { paymentMethod } = req.body;
+
+        const orders = await Order.findAll({
+            where: {
+                table_id: tableId,
+                paymentStatus: 'UNPAID'
+            }
+        });
+
+        if (orders.length === 0) {
+            return res.status(404).json({ message: "Không tìm thấy đơn hàng cần thanh toán" });
+        }
+
+        const orderIds = orders.map(o => o.id);
+
+        await Order.update({
+            paymentStatus: 'PAID',
+            status: 'COMPLETED',
+            paymentMethod: paymentMethod || 'CASH'
+        }, {
+            where: { id: orderIds },
+            transaction: t
+        });
+
+        await RestaurantTable.update(
+            { status: 'AVAILABLE' },
+            { where: { id: tableId }, transaction: t }
+        );
+
+        await t.commit();
+        res.json({ message: `Đã thanh toán thành công ${orders.length} đơn hàng.` });
+    } catch (error) {
+        if (t) await t.rollback();
+        console.error("Pay All Orders Error:", error);
         next(error);
     }
 };
@@ -196,7 +261,7 @@ exports.payOrder = async (req, res, next) => {
     const t = await sequelize.transaction();
     try {
         const { id } = req.params;
-        const { paymentMethod } = req.body; // CASH or TRANSFER
+        const { paymentMethod } = req.body;
 
         const order = await Order.findByPk(id);
 
@@ -224,15 +289,12 @@ exports.payOrder = async (req, res, next) => {
         await t.commit();
         res.json({ message: "Thanh toán thành công. Bàn hiện đã sẵn sàng." });
     } catch (error) {
-        await t.rollback();
+        if (t) await t.rollback();
         console.error("Pay Order Error:", error);
         next(error);
     }
 };
 
-/**
- * Tạo link QR PayOS/VietQR cho đơn hàng
- */
 exports.getPaymentQR = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -242,13 +304,10 @@ exports.getPaymentQR = async (req, res, next) => {
             return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
         }
 
-        // Thông tin tài khoản nhận tiền (Bạn hãy thay đổi theo thông tin thật)
-        const BANK_ID = "970422"; // MB Bank (Ví dụ)
+        const BANK_ID = "970422";
         const ACCOUNT_NO = "0123456789";
         const ACCOUNT_NAME = "NHA HANG FUTURE SUSHI";
 
-        // Tạo link VietQR (Hỗ trợ quét qua App ngân hàng)
-        // Cấu trúc: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<NAME>
         const amount = Math.round(order.finalPrice);
         const description = `THANH TOAN DON HANG ${order.id}`;
 
