@@ -15,18 +15,41 @@ if (PayOS) {
 
 exports.createPaymentLink = async (req, res, next) => {
     try {
-        const { orderId } = req.body;
-        const order = await Order.findByPk(orderId);
-        if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+        const { orderId, tableId } = req.body;
+        let amount = 0;
+        let description = "";
+        let orderToUpdate = null;
+
+        if (tableId) {
+            // Thanh toán gộp theo bàn
+            const orders = await Order.findAll({
+                where: { table_id: tableId, paymentStatus: 'UNPAID' }
+            });
+            if (orders.length === 0) return res.status(404).json({ message: "Không tìm thấy hóa đơn chưa thanh toán cho bàn này" });
+
+            amount = orders.reduce((sum, o) => sum + Number(o.finalPrice), 0);
+            description = `TTOAN BAN B${tableId}`;
+            // Với gộp, ta sẽ lưu orderCode vào tất cả các đơn hàng của bàn đó
+            orderToUpdate = orders;
+        } else if (orderId) {
+            // Thanh toán đơn lẻ
+            const order = await Order.findByPk(orderId);
+            if (!order) return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+
+            amount = Number(order.finalPrice);
+            description = `THANHTOAN DH${order.id}`;
+            orderToUpdate = [order];
+        } else {
+            return res.status(400).json({ message: "Thiếu orderId hoặc tableId" });
+        }
 
         const domain = "http://54.81.9.236:3000";
-        // Tạo orderCode duy nhất (Sử dụng 8 số cuối của timestamp)
         const orderCode = Number(String(Math.floor(Date.now() / 1000)).slice(-8));
 
         const paymentBody = {
             orderCode: orderCode,
-            amount: Math.round(Number(order.finalPrice)),
-            description: `THANHTOAN DH${order.id}`,
+            amount: Math.round(amount),
+            description: description,
             returnUrl: `${domain}/api/payos/payment-success`,
             cancelUrl: `${domain}/api/payos/payment-cancel`,
         };
@@ -38,12 +61,13 @@ exports.createPaymentLink = async (req, res, next) => {
             paymentLinkResponse = await payos.createPaymentLink(paymentBody);
         }
 
-        // Cập nhật note cực kỳ quan trọng: lưu orderCode để đối soát
-        const currentNote = order.note || "";
-        const updatedNote = `${currentNote} [PAYOS:${orderCode}]`.trim();
-        await order.update({ note: updatedNote });
+        // Lưu orderCode để đối soát
+        for (const order of orderToUpdate) {
+            const currentNote = order.note || "";
+            const updatedNote = `${currentNote} [PAYOS:${orderCode}]`.trim();
+            await order.update({ note: updatedNote });
+        }
 
-        console.log(`[PayOS] Đã tạo link cho đơn #${order.id}. OrderCode: ${orderCode}`);
         res.json(paymentLinkResponse);
 
     } catch (error) {

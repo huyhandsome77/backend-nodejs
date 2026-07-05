@@ -27,7 +27,7 @@ module.exports = (sequelize) => {
             type: DataTypes.TEXT,
         },
         status: {
-            type: DataTypes.ENUM("PENDING", "CONFIRMED", "ARRIVED", "CHECKED_IN", "CANCELLED", "EXPIRED"),
+            type: DataTypes.ENUM("PENDING", "CONFIRMED", "ARRIVED", "CHECKED_IN", "COMPLETED", "CANCELLED", "EXPIRED"),
             defaultValue: "PENDING",
         },
     }, {

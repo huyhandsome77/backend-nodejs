@@ -1,4 +1,4 @@
-const { Order, OrderItem, Product, RestaurantTable, User, sequelize } = require('../models');
+const { Order, OrderItem, Product, RestaurantTable, User, Reservation, sequelize } = require('../models');
 
 exports.createOrder = async (req, res, next) => {
     const t = await sequelize.transaction();
@@ -205,7 +205,7 @@ exports.getCurrentOrderByTable = async (req, res, next) => {
         });
 
         if (!orders || orders.length === 0) {
-            return res.status(404).json({ message: "Bàn hiện không có hóa đơn chưa thanh toán" });
+            return res.json([]); // Trả về mảng rỗng thay vì 404 để tránh lỗi parsing trên Mobile
         }
 
         res.json(orders);
@@ -232,6 +232,15 @@ exports.payAllOrdersByTable = async (req, res, next) => {
             return res.status(404).json({ message: "Không tìm thấy đơn hàng cần thanh toán" });
         }
 
+        // Kiểm tra trạng thái đơn hàng: Chỉ cho phép thanh toán nếu đơn hàng đã READY hoặc các trạng thái hợp lệ
+        const invalidOrders = orders.filter(o => !['READY', 'COMPLETED'].includes(o.status));
+        if (invalidOrders.length > 0) {
+            return res.status(400).json({
+                message: "Không thể thanh toán. Có đơn hàng chưa hoàn thành chế biến.",
+                invalidOrderIds: invalidOrders.map(o => o.id)
+            });
+        }
+
         const orderIds = orders.map(o => o.id);
 
         await Order.update({
@@ -246,6 +255,18 @@ exports.payAllOrdersByTable = async (req, res, next) => {
         await RestaurantTable.update(
             { status: 'AVAILABLE' },
             { where: { id: tableId }, transaction: t }
+        );
+
+        // Tự động hoàn thành lịch đặt bàn liên quan nếu có
+        await Reservation.update(
+            { status: 'COMPLETED' },
+            {
+                where: {
+                    table_id: tableId,
+                    status: 'CHECKED_IN'
+                },
+                transaction: t
+            }
         );
 
         await t.commit();
@@ -273,6 +294,10 @@ exports.payOrder = async (req, res, next) => {
             return res.status(400).json({ message: "Đơn hàng này đã được thanh toán trước đó" });
         }
 
+        if (!['READY', 'COMPLETED'].includes(order.status)) {
+            return res.status(400).json({ message: "Đơn hàng phải ở trạng thái 'Chờ phục vụ' mới có thể thanh toán" });
+        }
+
         await order.update({
             paymentStatus: 'PAID',
             status: 'COMPLETED',
@@ -284,6 +309,18 @@ exports.payOrder = async (req, res, next) => {
                 { status: 'AVAILABLE' },
                 { where: { id: order.table_id }, transaction: t }
             );
+
+            // Tự động hoàn thành lịch đặt bàn liên quan nếu có
+            await Reservation.update(
+                { status: 'COMPLETED' },
+                {
+                    where: {
+                        table_id: order.table_id,
+                        status: 'CHECKED_IN'
+                    },
+                    transaction: t
+                }
+            );
         }
 
         await t.commit();
@@ -291,30 +328,6 @@ exports.payOrder = async (req, res, next) => {
     } catch (error) {
         if (t) await t.rollback();
         console.error("Pay Order Error:", error);
-        next(error);
-    }
-};
-
-exports.getPaymentQR = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        const order = await Order.findByPk(id);
-
-        if (!order) {
-            return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
-        }
-
-        const BANK_ID = "970422";
-        const ACCOUNT_NO = "0123456789";
-        const ACCOUNT_NAME = "NHA HANG FUTURE SUSHI";
-
-        const amount = Math.round(order.finalPrice);
-        const description = `THANH TOAN DON HANG ${order.id}`;
-
-        const qrUrl = `https://img.vietqr.io/image/${BANK_ID}-${ACCOUNT_NO}-compact.png?amount=${amount}&addInfo=${description}&accountName=${ACCOUNT_NAME}`;
-
-        res.json({ qrUrl });
-    } catch (error) {
         next(error);
     }
 };

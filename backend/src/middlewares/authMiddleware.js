@@ -37,6 +37,28 @@ exports.verifyToken = (req, res, next) => {
 
 };
 
+exports.optionalVerifyToken = (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            req.user = null;
+            return next();
+        }
+
+        const token = authHeader.split(" ")[1];
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || 'secret_key'
+        );
+        req.user = decoded;
+        next();
+    } catch (error) {
+        // Nếu token sai hoặc hết hạn, vẫn coi là khách vãng lai thay vì chặn lại
+        req.user = null;
+        next();
+    }
+};
+
 exports.isAdmin = (req, res, next) => {
     if (req.user && req.user.role && req.user.role.toUpperCase() === "ADMIN") {
         next();
